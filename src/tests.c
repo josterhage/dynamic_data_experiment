@@ -31,7 +31,7 @@ static void init_index(void)
 static void randomize_index(int *index, int n)
 {
 	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
 	srand(ts.tv_nsec);
 
 	for (size_t i = 0; i < n; i++) {
@@ -88,7 +88,7 @@ void close_all(void)
 static struct struct_a *new_struct_a(char *name)
 {
 	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
 	struct struct_a *_new = calloc(1, sizeof(struct struct_a));
 	srand(ts.tv_nsec);
 
@@ -125,21 +125,21 @@ void do_test_a(int count)
 
 	struct timespec start, end;
 	// Test 1: fill the list
-	clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
 	for (int i = 0; i < count; i++) {
 		struct struct_a *new = new_struct_a(words[set_list[i]]);
 
 		list_add(&new->list, &struct_a_list);
 	}
-	clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
 
-	printf("%ldus\n", (end.tv_nsec - start.tv_nsec) / 1000);
+	printf("%luns\n", (end.tv_nsec - start.tv_nsec));
 
 	int sub_count = count / 1000;
 	printf("Test 2: searching through the list for %d randomized names\n",
 			sub_count);
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
 	for (int i = 0; i < sub_count; i++) {
 		struct struct_a *entry;
 		list_for_each_entry(entry, &struct_a_list, list) {
@@ -147,9 +147,25 @@ void do_test_a(int count)
 				break;
 		}
 	}
-	clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
 
-	printf("%ldus\n", (end.tv_nsec- start.tv_nsec) / 1000);
+	printf("%luns\n", (end.tv_nsec- start.tv_nsec));
+
+	sub_count = count / 200;
+	printf("Test 3: searching through the list for %d randomized names\n",
+			sub_count);
+
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+	for (int i = 0; i < sub_count; i++) {
+		struct struct_a *entry;
+		list_for_each_entry(entry, &struct_a_list, list) {
+			if (!strcmp(entry->name, words[get_list[i]]))
+				break;
+		}
+	}
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+
+	printf("%luns\n", (end.tv_nsec- start.tv_nsec));
 
 	free_list();
 }
@@ -157,7 +173,7 @@ void do_test_a(int count)
 static struct struct_b *new_b(char *name)
 {	
 	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
 	struct struct_b *_new = calloc(1, sizeof(struct struct_b));
 	srand(ts.tv_nsec);
 
@@ -181,12 +197,12 @@ void do_test_b(int count)
 
 	struct struct_b *b_list = calloc(1, sizeof(struct struct_b));
 
-	printf("Test 1: Filling a dynamic array with %d instances of struct_b took\n",
+	printf("Test 1: Filling a dynamic array with %d instances of struct_b\n",
 			count);
 
 	struct timespec start, end;
 	// Test 1: fill the list
-	clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
 	for (int i = 0; i < count; i++) {
 		struct struct_b *_b_list = realloc(b_list, (i+1) * sizeof(struct struct_b));
 		if (!_b_list) {
@@ -203,25 +219,41 @@ void do_test_b(int count)
 		b_list[i].minor = rand();
 		b_list[i].priv = calloc(1, sizeof(struct priv_b));
 	}
-	clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
 
-	printf("%ldus\n", (end.tv_nsec - start.tv_nsec) / 1000);
+	printf("%luns\n", (end.tv_nsec - start.tv_nsec));
 
 	int sub_count = count / 1000;
 
 	printf("Test 2: searching through the list for %d randomized names\n",
 			sub_count);
 
-	clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
 	for (int i = 0; i < sub_count; i++) {
 		for (int i = 0; i < count; i++) {
 			if (!strcmp(b_list[i].name, words[get_list[i]]))
 				continue;
 		}
 	}
-	clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
 
-	printf("%ldus\n", (end.tv_nsec- start.tv_nsec) / 1000);
+	printf("%luns\n", (end.tv_nsec- start.tv_nsec));
+
+	sub_count = count / 200;
+
+	printf("Test 3: searching through the list for %d randomized names\n",
+			sub_count);
+
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+	for (int i = 0; i < sub_count; i++) {
+		for (int i = 0; i < count; i++) {
+			if (!strcmp(b_list[i].name, words[get_list[i]]))
+				continue;
+		}
+	}
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+
+	printf("%luns\n", (end.tv_nsec- start.tv_nsec));
 
 	free(b_list);
 }
