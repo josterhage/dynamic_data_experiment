@@ -11,9 +11,6 @@
 #include "linux-list.h"
 #include "tests.h"
 
-#define LINES 466550 // output from wc -l words.txt
-#define WORDS_MEM_SZ LINES * sizeof(size_t)
-
 static char **words;
 static int words_fd;
 
@@ -92,11 +89,12 @@ static struct struct_a *new_struct_a(char *name)
 	struct struct_a *_new = calloc(1, sizeof(struct struct_a));
 	srand(ts.tv_nsec);
 
-	_new->name = name;
-	_new->name_len = strlen(name);
+	_new->name_len = strlen(name) + 1;
+	_new->name = calloc(_new->name_len, sizeof(char));
+	strcpy(_new->name, name);
 	_new->major = rand();
 	_new->minor = rand();
-	_new->priv = calloc(1, sizeof(struct priv_a));
+	_new->priv = calloc(1, sizeof(struct priv));
 
 	return _new;
 }
@@ -108,6 +106,18 @@ static void free_list(void) {
 		list_del(cursor);
 		free(list_entry(cursor,struct struct_a, list));
 	}
+}
+
+static void set_priv(void *priv) {
+	struct priv *_priv = priv;
+
+	struct timespec ts;
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+	srand(ts.tv_nsec);
+
+	_priv->a = rand();
+	_priv->b = rand();
+	_priv->c = rand();
 }
 
 void do_test_a(int count)
@@ -123,65 +133,70 @@ void do_test_a(int count)
 
 	printf("Test 1: Filling a linked-list with %d instances of struct_a\n", count);
 
-	struct timespec start, end;
+	uint64_t start = 0;
+	uint64_t end   = 0;
 	// Test 1: fill the list
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+	start = get_tsc();
 	for (int i = 0; i < count; i++) {
 		struct struct_a *new = new_struct_a(words[set_list[i]]);
 
 		list_add(&new->list, &struct_a_list);
 	}
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+	end = get_tsc();
 
-	printf("%luns\n", (end.tv_nsec - start.tv_nsec));
-
-	int sub_count = count / 1000;
+	printf("%luhz\n", (end - start));
+	
+	int sub_count = 100;
 	printf("Test 2: searching through the list for %d randomized names\n",
 			sub_count);
 
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+	start = get_tsc();
 	for (int i = 0; i < sub_count; i++) {
 		struct struct_a *entry;
 		list_for_each_entry(entry, &struct_a_list, list) {
-			if (!strcmp(entry->name, words[get_list[i]]))
+			if (!strcmp(entry->name, words[get_list[i]])){
+				set_priv(entry->priv);
 				break;
+			}
 		}
 	}
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+	end = get_tsc();
 
-	printf("%luns\n", (end.tv_nsec- start.tv_nsec));
+	printf("%luhz\n", (end- start));
 
-	sub_count = count / 200;
+	sub_count = 500;
 	printf("Test 3: searching through the list for %d randomized names\n",
 			sub_count);
 
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+	start = get_tsc();
 	for (int i = 0; i < sub_count; i++) {
 		struct struct_a *entry;
 		list_for_each_entry(entry, &struct_a_list, list) {
-			if (!strcmp(entry->name, words[get_list[i]]))
+			if (!strcmp(entry->name, words[get_list[i]])){
+				set_priv(entry->priv);
 				break;
+			}
 		}
 	}
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+	end = get_tsc();
 
-	printf("%luns\n", (end.tv_nsec- start.tv_nsec));
+	printf("%luhz\n", (end- start));
 
 	free_list();
 }
 
-static struct struct_b *new_b(char *name)
+static struct struct_b *construct_b(struct struct_b * sb, char *name)
 {	
 	struct timespec ts;
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-	struct struct_b *_new = calloc(1, sizeof(struct struct_b));
 	srand(ts.tv_nsec);
 
-	_new->name = name;
-	_new->name_len = strlen(name);
-	_new->major = rand();
-	_new->minor = rand();
-	_new->priv = calloc(1, sizeof(struct priv_b));
+	sb->name_len = strlen(name) + 1;
+	sb->name = calloc(sb->name_len, sizeof(char));
+	strcpy(sb->name, name);
+	sb->major = rand();
+	sb->minor = rand();
+	sb->priv = calloc(1, sizeof(struct priv));
 }
 
 void do_test_b(int count)
@@ -200,9 +215,10 @@ void do_test_b(int count)
 	printf("Test 1: Filling a dynamic array with %d instances of struct_b\n",
 			count);
 
-	struct timespec start, end;
+	uint64_t start = 0;
+	uint64_t end   = 0;
 	// Test 1: fill the list
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+	start = get_tsc();
 	for (int i = 0; i < count; i++) {
 		struct struct_b *_b_list = realloc(b_list, (i+1) * sizeof(struct struct_b));
 		if (!_b_list) {
@@ -210,50 +226,48 @@ void do_test_b(int count)
 			exit(1);
 		}
 		b_list = _b_list;
-		
-		srand(start.tv_nsec);
 
-		b_list[i].name = words[set_list[i]];
-		b_list[i].name_len = strlen(b_list[i].name);
-		b_list[i].major = rand();
-		b_list[i].minor = rand();
-		b_list[i].priv = calloc(1, sizeof(struct priv_b));
+		construct_b(&b_list[i], words[set_list[i]]);
 	}
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+	end = get_tsc();
 
-	printf("%luns\n", (end.tv_nsec - start.tv_nsec));
+	printf("%luhz\n", (end - start));
 
-	int sub_count = count / 1000;
+	int sub_count = 100;
 
 	printf("Test 2: searching through the list for %d randomized names\n",
 			sub_count);
 
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+	start = get_tsc();
 	for (int i = 0; i < sub_count; i++) {
 		for (int i = 0; i < count; i++) {
-			if (!strcmp(b_list[i].name, words[get_list[i]]))
-				continue;
+			if (!strcmp(b_list[i].name, words[get_list[i]])) {
+				set_priv(b_list[i].priv);
+				break;
+			}
 		}
 	}
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+	end = get_tsc();
 
-	printf("%luns\n", (end.tv_nsec- start.tv_nsec));
+	printf("%luhz\n", (end- start));
 
-	sub_count = count / 200;
+	sub_count = 500;
 
 	printf("Test 3: searching through the list for %d randomized names\n",
 			sub_count);
 
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+	start = get_tsc();
 	for (int i = 0; i < sub_count; i++) {
 		for (int i = 0; i < count; i++) {
-			if (!strcmp(b_list[i].name, words[get_list[i]]))
-				continue;
+			if (!strcmp(b_list[i].name, words[get_list[i]])) {
+				set_priv(b_list[i].priv);
+				break;
+			}
 		}
 	}
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+	end = get_tsc();
 
-	printf("%luns\n", (end.tv_nsec- start.tv_nsec));
+	printf("%luhz\n", (end- start));
 
 	free(b_list);
 }
