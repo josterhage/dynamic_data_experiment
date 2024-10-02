@@ -11,76 +11,7 @@
 #include "linux-list.h"
 #include "tests.h"
 
-static char **words;
-static int words_fd;
-
-static int all_index[LINES];
-
 static LIST_HEAD(struct_a_list);
-
-static void init_index(void)
-{
-	for (size_t i = 0; i < LINES; i++) {
-		all_index[i] = i;
-	}
-}
-
-static void randomize_index(int *index, int n)
-{
-	struct timespec ts;
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-	srand(ts.tv_nsec);
-
-	for (size_t i = 0; i < n; i++) {
-		int swap_idx = rand() % n;
-		int tmp = index[i];
-		index[i] = index[swap_idx];
-		index[swap_idx] = tmp;
-	}
-}
-
-void load_words(void)
-{
-	words_fd = open("words.txt", O_RDWR);
-
-	struct stat st;
-	fstat(words_fd, &st);
-
-	/* 
-	 * I'm going to cheat a little bit for the array of words. Instead of
-	 * calling {m|c}alloc repeatedly I'm going to mmap the words list and
-	 * char **words.
-	 */
-
-	char *w_buf = mmap(NULL,st.st_size, PROT_WRITE | PROT_READ, 
-	                   MAP_PRIVATE, words_fd, 0);
-
-    words = mmap(NULL, WORDS_MEM_SZ, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS,
-	             -1, 0);
-
-	memset(words,0,WORDS_MEM_SZ);
-
-	char **words_cursor = words;
-	*words_cursor = w_buf;
-
-	for (char *cursor = w_buf; *cursor; cursor++) {
-		if (*cursor == '\n') {
-			*cursor = 0;
-			*(++words_cursor) = ++cursor;
-		}
-	}
-
-	init_index();
-}
-
-void close_all(void)
-{
-	struct stat st;
-	fstat(words_fd, &st);
-	munmap(*words, WORDS_MEM_SZ);
-	munmap(words, st.st_size);
-	close(words_fd);	
-}
 
 static struct struct_a *new_struct_a(char *name)
 {
@@ -185,7 +116,7 @@ void do_test_a(int count)
 	free_list();
 }
 
-static struct struct_b *construct_b(struct struct_b * sb, char *name)
+static void construct_b(struct struct_b * sb, char *name)
 {	
 	struct timespec ts;
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);

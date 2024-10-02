@@ -7,14 +7,6 @@
 #include "linux-list.h"
 
 #define LINES 466550 // output from wc -l words.txt
-#define WORDS_MEM_SZ LINES * sizeof(size_t)
-
-struct test_manager {
-	char **word_list;
-	int common_index[LINES];
-	struct timespec ts;
-	struct list_head results;
-};
 
 enum data_structure {
 	LINKED_LIST,
@@ -27,10 +19,10 @@ enum allocation_method {
 };
 
 enum operation {
-	CREATE = 1,
-	READ   = 2,
-	UPDATE = 4,
-	DELETE = 8,
+	CREATE,
+	READ,
+	UPDATE,
+	DELETE,
 };
 
 extern const char *data_structure_names[];
@@ -40,28 +32,43 @@ extern const char *operation_names[];
 struct test_result {
 	enum data_structure 	structure;
 	enum allocation_method 	method;
-	enum operation			ops;
-	int 					nr_ops;
-	uint64_t				tsc_start;
-	uint64_t				tsc_end;
+	enum operation			operation;
+	uint64_t				runtime_hz;
 	struct list_head		list_node;
 };
 
-struct mm_struct {
-	void *(*alloc)(struct mm_struct *mm_struct, size_t size);
-	void (*free)(struct mm_struct *mm_struct, void *obj);
-	void *mm_priv;
+struct test_manager;
+
+typedef int (*test_fn)(struct test_manager *, struct mm_struct *);
+
+struct test_struct {
+	enum allocation_method method;
+	size_t elements;
+	size_t iterations;
 };
 
-struct mm_struct *get_mempool_allocator(size_t size, size_t object_size);
-void delete_mempool_allocator(struct mm_struct *allocator);
+struct test_manager {
+	char **word_list;
+	size_t word_list_size;
+	int common_index[LINES];
+	struct timespec ts;
+	struct list_head results;
+	void (*add_result)(struct test_manager *, struct test_result *);
+	void (*print_results)(struct test_manager *);
+	int (*save_results)(struct test_manager *, char *path);
+	void (*close_base_manager)(struct test_manager *);
+	uint64_t (*do_one_test)(struct test_manager *, test_fn fn);
+	/* Pure virtual */
+	int (*do_tests)(struct test_manager *, struct test_struct *);
+};
 
-void load_words(void);
-void close_all(void);
-void do_test_a(int count);
-void do_test_b(int count);
+void init_manager(struct test_manager *new);
+void randomize_index(struct timespec *ts, int *index, int n);
 
-struct struct_a {
+struct test_manager *init_ll_test_manager(void);
+
+
+struct ll_struct {
 	char *name;
 	int name_len;
 	int major;
@@ -70,7 +77,7 @@ struct struct_a {
 	struct list_head list;
 };
 
-struct struct_b {
+struct arr_struct {
 	char *name;
 	int name_len;
 	int major;

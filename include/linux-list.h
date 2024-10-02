@@ -22,8 +22,8 @@ struct list_head {
 	struct list_head *next, *prev;
 };
 
-#define LIST_POISON1 0x100
-#define LIST_POISON2 0x122
+#define LIST_POISON1 ((void *)0x100)
+#define LIST_POISON2 ((void *)0x122)
 
 #define container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
